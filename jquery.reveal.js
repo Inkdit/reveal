@@ -36,16 +36,34 @@
 
       function openAnimation() {
         modalBg.unbind('click.modalEvent');
-        $('.' + options.dismissModalClass).unbind('click.modalEvent');
+        modal.find('.' + options.dismissModalClass).unbind('click.modalEvent');
         if (!locked) {
           lockModal();
+
           modal.css({'top': $(document).scrollTop() - topOffset, 'opacity': 0, 'visibility': 'visible'});
           modalBg.fadeIn(options.animationSpeed / 2);
           modal.delay(options.animationSpeed / 2).animate({
             "top": $(document).scrollTop() + topMeasure + 'px',
             "opacity": 1
           }, options.animationSpeed, unlockModal);
+
+          if($.fn.reveal.stack.length > 0) {
+            var newModalBottom = $(document).scrollTop() + topMeasure + modal.height();
+            var lastModal = $($.fn.reveal.stack[0]);
+
+            lastModal.delay(options.animationSpeed / 2).animate({
+              "top": newModalBottom + topMeasure + 'px',
+              "opacity": 0
+            }, options.animationSpeed, function () {
+              // set it to display: none in case it's hanging off the bottom of
+              // the document
+              lastModal.hide();
+            });
+          }
+
+          $.fn.reveal.stack.unshift(modal);
         }
+
         modal.unbind('reveal:open', openAnimation);
       }
       modal.bind('reveal:open', openAnimation);
@@ -53,7 +71,13 @@
       function closeAnimation() {
         if (!locked) {
           lockModal();
-          modalBg.delay(options.animationSpeed).fadeOut(options.animationSpeed);
+
+          // get rid of the overlay if this is the last modal on the stack
+          if($.fn.reveal.stack.length == 1)
+            modalBg.delay(options.animationSpeed).fadeOut(options.animationSpeed);
+
+          $.fn.reveal.stack.shift();
+
           modal.animate({
             "top":  $(document).scrollTop() - topOffset + 'px',
             "opacity": 0
@@ -61,20 +85,32 @@
             modal.css({'top': topMeasure, 'opacity': 1, 'visibility': 'hidden'});
             unlockModal();
           });
+
+          if($.fn.reveal.stack.length > 0) {
+            var lastModal = $($.fn.reveal.stack[0]);
+
+            lastModal.show();
+
+            lastModal.animate({
+              "top": $(document).scrollTop() + topMeasure + 'px',
+              "opacity": 1
+            }, options.animationSpeed / 2);
+          }
         }
         modal.unbind('reveal:close', closeAnimation);
       }
       modal.bind('reveal:close', closeAnimation);
       modal.trigger('reveal:open');
 
-      var closeButton = $('.' + options.dismissModalClass).bind('click.modalEvent', function () {
+      var closeButton = modal.find('.' + options.dismissModalClass).bind('click.modalEvent', function () {
         modal.trigger('reveal:close');
       });
 
       if (options.closeOnBackgroundClick) {
         modalBg.css({"cursor": "pointer"});
         modalBg.bind('click.modalEvent', function () {
-          modal.trigger('reveal:close');
+          if($.fn.reveal.stack.length > 0)
+            $($.fn.reveal.stack[0]).trigger('reveal:close');
         });
       }
 
@@ -93,4 +129,6 @@
       }
     });
   };
+  // a global stack of active modals
+  $.fn.reveal.stack = [];
 })(jQuery);
